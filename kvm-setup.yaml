@@ -1,0 +1,26 @@
+---
+- name: Set up KVM on the host
+  hosts: kvm_hosts
+  become: yes
+  tasks:
+    - name: Install KVM and related packages
+      yum:
+        name:
+          - qemu-kvm
+          - libvirt
+          - virt-install
+          - bridge-utils
+        state: present
+
+    - name: Start and enable libvirtd service
+      service:
+        name: libvirtd
+        state: started
+        enabled: yes
+
+    - name: Ensure virtualization is enabled in the BIOS
+      shell: |
+        egrep -c '(vmx|svm)' /proc/cpuinfo
+      register: virtualization_check
+      failed_when: virtualization_check.stdout == "0"
+      ignore_errors: yes
