@@ -1,0 +1,36 @@
+---
+- name: Clean up unused KVM resources
+  hosts: kvm_hosts
+  become: yes
+  vars:
+    vm_name: "ocp-worker-node"
+  tasks:
+    - name: List all running VMs
+      command: virsh list --all
+      register: vm_list
+
+    - name: Destroy the specified VM
+      command: virsh destroy {{ vm_name }}
+      when: vm_name in vm_list.stdout
+
+    - name: Undefine the specified VM
+      command: virsh undefine {{ vm_name }}
+      when: vm_name in vm_list.stdout
+
+    - name: Remove the QCOW2 disk image
+      file:
+        path: "/var/lib/libvirt/images/{{ vm_name }}.qcow2"
+        state: absent
+
+    - name: Remove unused networks
+      command: virsh net-destroy <network_name>
+      loop:
+        - br0
+        - default
+      when: "'<network_name>' in vm_list.stdout"
+
+    - name: Clean up unused volumes
+      command: virsh vol-delete --pool default <volume_name>
+      loop:
+        - "{{ vm_name }}.qcow2"
+      ignore_errors: yes
