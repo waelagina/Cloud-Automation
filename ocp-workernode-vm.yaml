@@ -1,0 +1,35 @@
+---
+- name: Create an OpenShift worker node VM
+  hosts: kvm_hosts
+  become: yes
+  vars:
+    vm_name: "ocp-worker-node"
+    vm_ram: "16384"
+    vm_cpus: "8"
+    vm_disk_size: "50"
+    ignition_file_url: "http://local-server/ignition.config"
+    os_variant: "rhel8.0"
+    network_bridge: "br0"
+  tasks:
+    - name: Create a QCOW2 disk image for the VM
+      command: >
+        qemu-img create -f qcow2 /var/lib/libvirt/images/{{ vm_name }}.qcow2 {{ vm_disk_size }}G
+
+    - name: Create the VM using virt-install
+      command: >
+        virt-install --name={{ vm_name }}
+        --ram={{ vm_ram }} --vcpus={{ vm_cpus }}
+        --disk path=/var/lib/libvirt/images/{{ vm_name }}.qcow2
+        --os-variant {{ os_variant }}
+        --network bridge={{ network_bridge }}
+        --graphics none
+        --location=http://mirror.centos.org/centos/8-stream/BaseOS/x86_64/os/
+        --extra-args="console=ttyS0 coreos.inst.install_dev=vda coreos.inst.ignition_url={{ ignition_file_url }}"
+      register: vm_creation
+      until: vm_creation.rc == 0
+      retries: 3
+      delay: 10
+
+    - name: Wait for the VM to boot and join the OpenShift cluster
+      pause:
+        seconds: 300  
